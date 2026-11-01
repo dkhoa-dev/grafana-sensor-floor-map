@@ -1,9 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.2.2 (2026-11-01)
 
 - The AI model choice is stored in the browser under a key prefixed with the plugin id (`dkhoa-sensorfloormap-panel.ai`). A choice saved by an earlier version moves to the new key on first read.
-- The floor plan editor sanitises the static part of the plan where it draws it, instead of relying on the code that built the plan.
+- The floor plan editor sanitises the static part of the plan where it draws it, instead of relying on the code that built the plan, so markup that skipped the earlier sanitising cannot run script in the editor.
+- CI and the release workflow run on Node 24, which `@grafana/sign-plugin` 4 requires.
+- Release archives are signed by the release workflow.
 
 ## 0.2.1 (2026-10-26)
 
