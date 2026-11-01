@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- The AI model choice is stored in the browser under a key prefixed with the plugin id (`dkhoa-sensorfloormap-panel.ai`). A choice saved by an earlier version moves to the new key on first read.
+- The floor plan editor sanitises the static part of the plan where it draws it, instead of relying on the code that built the plan.
+
 ## 0.2.1 (2026-10-26)
 
 - Room links that leave Grafana open in the same tab without touching `window.location`, as Grafana's plugin rules require.

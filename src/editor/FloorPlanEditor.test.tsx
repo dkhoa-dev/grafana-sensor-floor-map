@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { emptyPlan, parsePlan, PlanModel } from './model';
 import { FloorPlanEditor } from './FloorPlanEditor';
+import { expectInert, HOSTILE_FRAGMENT } from '../svg/hostile.testutil';
 
 // jsdom has no PointerEvent, so pointer events would lose their coordinates.
 if (!('PointerEvent' in window)) {
@@ -34,6 +35,13 @@ const drag = (el: Element, from: [number, number], to: [number, number]) => {
 };
 
 describe('FloorPlanEditor', () => {
+  it('cleans static markup it is given directly, without relying on parsePlan', () => {
+    const { canvas } = setup({ ...emptyPlan(), staticMarkup: HOSTILE_FRAGMENT });
+    expectInert(canvas);
+    expect(canvas.querySelector('path[d="M0 0 L50 50"]')).not.toBeNull();
+    expect(canvas).toHaveTextContent('Corridor');
+  });
+
   it('draws a snapped rectangle and names it', () => {
     const { canvas, save } = setup();
     fireEvent.click(screen.getByRole('radio', { name: /Rectangle/ }));

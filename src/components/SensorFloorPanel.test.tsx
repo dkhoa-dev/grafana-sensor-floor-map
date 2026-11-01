@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { createDataFrame, FieldType, getDefaultTimeRange, LoadingState, PanelProps } from '@grafana/data';
 import { SensorFloorOptions } from '../types';
 import { SensorFloorPanel, buildRoomLink, isSafeLink } from './SensorFloorPanel';
+import { expectInert, HOSTILE_PLAN } from '../svg/hostile.testutil';
 
 const PLAN = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 100">
   <title>should be removed</title>
@@ -97,6 +98,12 @@ describe('SensorFloorPanel', () => {
     const { room } = setup({ linkUrl: '/d/room?var-room=${room}' });
     expect(room('Lab 1').getAttribute('role')).toBe('link');
     expect(room('Attic').getAttribute('role')).toBeNull();
+  });
+
+  it('cleans the plan before mounting it', () => {
+    const { container } = setup({ floorPlan: HOSTILE_PLAN });
+    expectInert(container);
+    expect(container.querySelector('path[d="M0 0 L50 50"]')).not.toBeNull();
   });
 
   it('asks for a plan when none is set', () => {
