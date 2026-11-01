@@ -28,6 +28,8 @@ jobs:
         with:
           # Lets Grafana's plugin review verify that the archive was built from this repository.
           attestation: true
+          # @grafana/sign-plugin 4 needs Node >=24.5; the action defaults to Node 20.
+          node-version: '24'
           # Uncomment to enable plugin signing
           # (For more info on how to generate the access policy token see https://grafana.com/developers/plugin-tools/publish-a-plugin/sign-a-plugin#generate-an-access-policy-token)
           # Make sure to save the token in your repository secrets
