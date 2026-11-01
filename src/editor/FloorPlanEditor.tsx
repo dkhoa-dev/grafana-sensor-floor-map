@@ -26,6 +26,7 @@ import {
   uniqueName,
 } from './model';
 import { AiAssistant } from '../ai/AiAssistant';
+import { sanitizeSvgFragment } from '../svg/floorPlan';
 
 type Tool = 'select' | 'rect' | 'polygon';
 
@@ -95,6 +96,8 @@ export const FloorPlanEditor: React.FC<Props> = ({ initial, dataRooms, onSave, o
   const handle = scale / 120;
   const selectedShape = plan.shapes.find((s) => s.id === selected);
   const missing = useMemo(() => addRoomsAsGrid(plan, dataRooms).shapes.length - plan.shapes.length, [plan, dataRooms]);
+  // Cleaned here, at the sink, rather than trusting every caller to have built `initial` with parsePlan.
+  const staticMarkup = useMemo(() => sanitizeSvgFragment(plan.staticMarkup), [plan.staticMarkup]);
 
   /** Records `before` in the undo history and applies `next`. */
   const commit = (next: PlanModel, before: PlanModel = plan) => {
@@ -420,7 +423,7 @@ export const FloorPlanEditor: React.FC<Props> = ({ initial, dataRooms, onSave, o
             stroke={theme.colors.border.medium}
             strokeWidth={scale / 600}
           />
-          {plan.staticMarkup && <g className={styles.static} dangerouslySetInnerHTML={{ __html: plan.staticMarkup }} />}
+          {staticMarkup && <g className={styles.static} dangerouslySetInnerHTML={{ __html: staticMarkup }} />}
           {plan.shapes.map((s) => {
             const isSel = s.id === selected;
             const common = {

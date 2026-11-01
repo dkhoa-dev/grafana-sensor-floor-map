@@ -1,5 +1,6 @@
 import { loadsExternalResource } from './externalRefs';
-import { listRooms, sanitizeFloorPlan, scopeIds } from './floorPlan';
+import { listRooms, sanitizeFloorPlan, sanitizeSvgFragment, scopeIds } from './floorPlan';
+import { expectInert, HOSTILE_FRAGMENT } from './hostile.testutil';
 
 const NS = 'xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"';
 
@@ -148,5 +149,31 @@ describe('scopeIds', () => {
     expect(a.getAttribute('clip-path')).toBe('url(#p1-c)');
     expect(host.querySelector('use')?.getAttribute('xlink:href')).toBe('#p1-room-A');
     expect(host.querySelector('[data-room="B"]')?.getAttribute('fill')).toBe('url(#unknown)');
+  });
+});
+
+describe('sanitizeSvgFragment', () => {
+  const mount = (fragment: string) => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.innerHTML = sanitizeSvgFragment(fragment);
+    return svg;
+  };
+
+  it('strips hostile children but keeps the drawing, as SVG', () => {
+    const svg = mount(HOSTILE_FRAGMENT);
+    expectInert(svg);
+    expect(svg.querySelector('path')?.getAttribute('d')).toBe('M0 0 L50 50');
+    expect(svg.querySelector('path')?.namespaceURI).toBe('http://www.w3.org/2000/svg');
+    expect(svg.querySelector('text')?.textContent).toBe('Corridor');
+  });
+
+  it('drops markup that closes the wrapper to escape it', () => {
+    expect(sanitizeSvgFragment('<path d="M0 0"/></svg><p id="outside">x</p><svg><circle r="1"/>')).toBe(
+      '<path d="M0 0"></path>'
+    );
+  });
+
+  it('returns an empty string for empty input', () => {
+    expect(sanitizeSvgFragment('  ')).toBe('');
   });
 });

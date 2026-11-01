@@ -55,6 +55,20 @@ export function sanitizeFloorPlan(markup: string): string {
   });
 }
 
+/**
+ * sanitizeFloorPlan for the children of an <svg> (a fragment such as `<path/><text/>`), returning
+ * the cleaned children. A bare fragment would parse as HTML and lose its drawing, so it is cleaned
+ * inside an <svg> wrapper. Everything outside the first <svg> of the result is dropped.
+ */
+export function sanitizeSvgFragment(markup: string): string {
+  if (!markup.trim()) {
+    return '';
+  }
+  const clean = sanitizeFloorPlan(`<svg xmlns="http://www.w3.org/2000/svg">${markup}</svg>`);
+  const doc = new DOMParser().parseFromString(clean, 'text/html');
+  return doc.querySelector('svg')?.innerHTML.trim() ?? '';
+}
+
 const LOCAL_REF = /url\(\s*(['"]?)\s*#([^'")\s]+)\s*\1\s*\)/g;
 
 /**
