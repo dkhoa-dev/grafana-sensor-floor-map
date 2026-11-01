@@ -1,0 +1,76 @@
+# Signs the already reviewed v0.2.1 archive without rebuilding it.
+# The tag's release workflow ran without a signing token, so the published zip is unsigned.
+# This job takes that exact zip, adds the Grafana signature (MANIFEST.txt) with the
+# sign-plugin version locked at the tag, re-zips it and attests the result.
+name: Sign v0.2.1
+
+on:
+  push:
+    branches:
+      - sign/v0.2.1
+
+permissions: read-all
+
+jobs:
+  sign:
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    runs-on: ubuntu-latest
+    env:
+      TAG: v0.2.1
+      PLUGIN_ID: dkhoa-sensorfloormap-panel
+      ARCHIVE: dkhoa-sensorfloormap-panel-0.2.1.zip
+      REVIEWED_SHA1: 3d64eedaec21050fa2cc99e4c22014eaff70ca30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: v0.2.1
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      # Installs the sign-plugin version pinned in the tag's lockfile.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Fetch the reviewed archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/reviewed
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p "$ARCHIVE" -D /tmp/reviewed
+          echo "$REVIEWED_SHA1  /tmp/reviewed/$ARCHIVE" | sha1sum -c -
+          rm -rf dist "$PLUGIN_ID"
+          unzip -q "/tmp/reviewed/$ARCHIVE" -d /tmp/reviewed/x
+          test ! -e "/tmp/reviewed/x/$PLUGIN_ID/MANIFEST.txt"
+          mv "/tmp/reviewed/x/$PLUGIN_ID" dist
+
+      - name: Sign
+        env:
+          GRAFANA_ACCESS_POLICY_TOKEN: ${{ secrets.GRAFANA_ACCESS_POLICY_TOKEN }}
+        run: npx --no-install sign-plugin
+
+      - name: Package
+        run: |
+          mv dist "$PLUGIN_ID"
+          mkdir -p out
+          zip -q -r "out/$ARCHIVE" "$PLUGIN_ID"
+          cd out
+          sha1sum "$ARCHIVE" | cut -d' ' -f1 > "$ARCHIVE.sha1"
+          md5sum "$ARCHIVE" | cut -d' ' -f1 > "$ARCHIVE.md5"
+          cat "$ARCHIVE.sha1" "$ARCHIVE.md5"
+
+      - name: Attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: out/${{ env.ARCHIVE }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: signed-${{ env.TAG }}
+          path: out/
+          if-no-files-found: error
