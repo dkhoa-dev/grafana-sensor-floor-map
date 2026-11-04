@@ -10,6 +10,11 @@
 # - The App token has no `workflows` permission, so GitHub blocks workflow file
 #   changes (see additional_permissions). Edit deny rules for .github, .git and
 #   .claude add defense in depth (see claude_args).
+# - The action writes the App token into the origin URL in .git/config and into
+#   Claude's environment. Claude commits through the GitHub API instead of git,
+#   gets no Bash, and cannot read .git or /proc, so a prompt in an issue or PR
+#   body cannot copy the token into a commit (see use_commit_signing).
+# - Pull requests from forks are refused before Claude starts.
 # - No other repository secret is exposed to this job.
 name: Claude Code
 
@@ -42,6 +47,22 @@ jobs:
       issues: write
       id-token: write
     steps:
+      # The API commit tool reads each file from disk and follows symlinks, so
+      # a fork PR could add a link to .git/config and have Claude commit the
+      # token. Run only on PRs whose head branch is in this repository.
+      - name: Refuse pull requests from forks
+        if: github.event.issue.pull_request || github.event.pull_request
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+        run: |
+          head_repo=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.head.repo.full_name // ""')
+          if [ "$head_repo" != "$GITHUB_REPOSITORY" ]; then
+            echo "::error::Claude does not run on pull requests from forks (head repository: ${head_repo:-deleted})."
+            exit 1
+          fi
+
       - uses: actions/checkout@v7
         with:
           fetch-depth: 1
@@ -53,6 +74,11 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           include_comments_by_actor: 'khoapmdx,pmdk-bot'
           exclude_comments_by_actor: 'dependabot[bot]'
+          # Commits go through the action's GitHub API tool, so the action does
+          # not give Claude `git add`, `git commit` or the push script. With
+          # git, `git commit -F .git/config` could publish the token. Do not
+          # set ssh_signing_key: it brings those git tools back.
+          use_commit_signing: true
           # The action requests the App token Claude pushes with for exactly
           # these permissions. Without `workflows`, GitHub rejects any push or
           # API write that changes a file under .github/workflows. If this input
@@ -62,12 +88,12 @@ jobs:
             contents: write
             pull_requests: write
             issues: write
-          # Defense in depth only: acceptEdits auto-approves mv, cp, mkdir, rm
-          # and similar commands, which these rules do not cover. One Edit rule
-          # covers Edit, Write, MultiEdit, NotebookEdit and Bash redirect/tee
-          # targets. .git and .claude are denied because a hook or settings file
-          # written there would turn the allowed `git commit` into arbitrary
-          # commands.
+          # Defense in depth for the token: no Bash at all (acceptEdits would
+          # otherwise auto-approve cp, mv, sed and similar commands), and no
+          # reads of .git (the token in the origin URL) or /proc (the token in
+          # Claude's environment and arguments). One Edit rule covers Edit,
+          # Write, MultiEdit and NotebookEdit. .claude is denied because a
+          # settings file written there could allow tools or add hooks.
           claude_args: |
             --max-turns 10
-            --disallowedTools "Edit(.github/**),Edit(.git/**),Edit(.claude/**)"
+            --disallowedTools "Bash,Read(.git/**),Read(//proc/**),Edit(.github/**),Edit(.git/**),Edit(.claude/**)"
