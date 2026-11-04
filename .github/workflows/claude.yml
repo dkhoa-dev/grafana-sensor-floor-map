@@ -7,7 +7,9 @@
 #   id-token is only used to exchange the run's OIDC token for the App token.
 #   The App installation must include this repository.
 # - Claude only reads comments from the listed maintainers.
-# - Claude cannot write under .github, .git or .claude (see claude_args).
+# - The App token has no `workflows` permission, so GitHub blocks workflow file
+#   changes (see additional_permissions). Edit deny rules for .github, .git and
+#   .claude add defense in depth (see claude_args).
 # - No other repository secret is exposed to this job.
 name: Claude Code
 
@@ -51,15 +53,21 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           include_comments_by_actor: 'khoapmdx,pmdk-bot'
           exclude_comments_by_actor: 'dependabot[bot]'
-          # The App token can write workflow files, so Claude must never write
-          # under .github. One Edit rule covers every built-in file-writing tool
-          # (Edit, Write, MultiEdit, NotebookEdit) and Bash redirect/tee targets;
-          # Write(...)/MultiEdit(...)/NotebookEdit(...) path rules never match.
-          # .git and .claude are denied too: a hook or settings file written
-          # there would turn the allowed `git commit` into arbitrary commands.
-          # Tag mode allows no other Bash than git add/commit/rm and the push
-          # wrapper. Re-check this list before enabling use_commit_signing or
-          # adding --allowedTools: both change the tool set.
+          # The action requests the App token Claude pushes with for exactly
+          # these permissions. Without `workflows`, GitHub rejects any push or
+          # API write that changes a file under .github/workflows. If this input
+          # is empty, the action requests no permission set and the token
+          # exchange service picks one, so keep it non-empty.
+          additional_permissions: |
+            contents: write
+            pull_requests: write
+            issues: write
+          # Defense in depth only: acceptEdits auto-approves mv, cp, mkdir, rm
+          # and similar commands, which these rules do not cover. One Edit rule
+          # covers Edit, Write, MultiEdit, NotebookEdit and Bash redirect/tee
+          # targets. .git and .claude are denied because a hook or settings file
+          # written there would turn the allowed `git commit` into arbitrary
+          # commands.
           claude_args: |
             --max-turns 10
             --disallowedTools "Edit(.github/**),Edit(.git/**),Edit(.claude/**)"
