@@ -42,6 +42,30 @@ const requestedPermissions = (): Record<string, string> =>
       })
   );
 
+/**
+ * The `name: value` lines of a block mapping found by its exact indentation (0 for workflow
+ * level, 4 for the job), with comments dropped. Undefined when the mapping is absent.
+ */
+const mapping = (key: string, indent: number): Record<string, string> | undefined => {
+  const lines = workflow.split('\n');
+  const start = lines.findIndex((line) => line === `${' '.repeat(indent)}${key}:`);
+  if (start < 0) {
+    return undefined;
+  }
+  const entries: Record<string, string> = {};
+  for (const line of lines.slice(start + 1)) {
+    if (line.trim() === '' || line.trim().startsWith('#')) {
+      continue;
+    }
+    if (line.search(/\S/) <= indent) {
+      break;
+    }
+    const i = line.indexOf(':');
+    entries[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+  }
+  return entries;
+};
+
 describe('Claude workflow', () => {
   it('requests an App token with exactly contents, pull_requests and issues write', () => {
     expect(requestedPermissions()).toEqual({
@@ -95,6 +119,31 @@ describe('Claude workflow', () => {
       .split(',')
       .map((rule) => rule.trim());
     expect(denied).toEqual(expect.arrayContaining(['Bash', 'Read(.git/**)', 'Read(//proc/**)']));
+  });
+
+  // Claude pushes and comments with the App token (additional_permissions). The job token only
+  // checks out, lets the fork gate read the PR and backs the action's inline-comment fallback
+  // (`Post buffered inline comments` in action.yml at the pinned SHA), so it needs no contents or
+  // issues write. id-token is the OIDC exchange for the App token.
+  it('gives the job token write access to pull requests only', () => {
+    expect(mapping('permissions', 0)).toEqual({ contents: 'read' });
+    expect(mapping('permissions', 4)).toEqual({
+      contents: 'read',
+      'pull-requests': 'write',
+      issues: 'read',
+      'id-token': 'write',
+    });
+  });
+
+  // GitHub keeps one pending run per concurrency group and cancels the older one. At workflow level
+  // every comment enters the group, so a later comment without @claude (or a claude[bot] reply)
+  // would cancel a queued @claude run. At job level a skipped job never enters it.
+  it('serializes runs per issue or PR at job level, never at workflow level', () => {
+    expect(mapping('concurrency', 0)).toBeUndefined();
+    expect(mapping('concurrency', 4)).toEqual({
+      group: 'claude-${{ github.event.issue.number || github.event.pull_request.number }}',
+      'cancel-in-progress': 'false',
+    });
   });
 
   describe('fork gate', () => {
