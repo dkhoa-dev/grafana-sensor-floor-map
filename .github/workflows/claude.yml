@@ -7,6 +7,7 @@
 #   id-token is only used to exchange the run's OIDC token for the App token.
 #   The App installation must include this repository.
 # - Claude only reads comments from the listed maintainers.
+# - Claude cannot write under .github, .git or .claude (see claude_args).
 # - No other repository secret is exposed to this job.
 name: Claude Code
 
@@ -50,4 +51,15 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           include_comments_by_actor: 'khoapmdx,pmdk-bot'
           exclude_comments_by_actor: 'dependabot[bot]'
-          claude_args: '--max-turns 10'
+          # The App token can write workflow files, so Claude must never write
+          # under .github. One Edit rule covers every built-in file-writing tool
+          # (Edit, Write, MultiEdit, NotebookEdit) and Bash redirect/tee targets;
+          # Write(...)/MultiEdit(...)/NotebookEdit(...) path rules never match.
+          # .git and .claude are denied too: a hook or settings file written
+          # there would turn the allowed `git commit` into arbitrary commands.
+          # Tag mode allows no other Bash than git add/commit/rm and the push
+          # wrapper. Re-check this list before enabling use_commit_signing or
+          # adding --allowedTools: both change the tool set.
+          claude_args: |
+            --max-turns 10
+            --disallowedTools "Edit(.github/**),Edit(.git/**),Edit(.claude/**)"
