@@ -1,12 +1,15 @@
 # Interactive Claude Code: runs only when a comment, review comment or new issue
-# mentions @claude. GitHub only starts it for users with write access.
+# mentions @claude. The workflow has no access gate of its own: the action
+# refuses actors without write access after the job starts.
 #
 # Hardening (pilot):
 # - GitHub-hosted runner only.
 # - Authenticates to GitHub through the Claude GitHub App (posts as claude[bot]);
 #   id-token is only used to exchange the run's OIDC token for the App token.
 #   The App installation must include this repository.
-# - Claude only reads comments from the listed maintainers.
+# - Claude reads earlier comments only from the listed maintainers. The comment
+#   that starts the run is not filtered, so any user with write access can
+#   still prompt Claude.
 # - The App token has no `workflows` permission, so GitHub blocks workflow file
 #   changes (see additional_permissions). Edit deny rules for .github, .git and
 #   .claude add defense in depth (see claude_args).
@@ -15,6 +18,10 @@
 #   gets no Bash, and cannot read .git or /proc, so a prompt in an issue or PR
 #   body cannot copy the token into a commit (see use_commit_signing).
 # - Pull requests from forks are refused before Claude starts.
+# - The job token can only read code and issues. Claude pushes and comments
+#   with the App token; the job token checks out, looks up the PR for the fork
+#   gate and backs the action's fallback for inline review comments
+#   (pull-requests: write).
 # - No other repository secret is exposed to this job.
 name: Claude Code
 
@@ -29,10 +36,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
-  cancel-in-progress: false
-
 jobs:
   claude:
     if: |
@@ -41,10 +44,17 @@ jobs:
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Job-level, so a run whose job is skipped (no @claude) never enters the
+    # group. GitHub keeps one pending run per group: at workflow level a later
+    # comment without @claude, or a claude[bot] reply, would cancel a queued
+    # @claude run.
+    concurrency:
+      group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+      cancel-in-progress: false
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
-      issues: write
+      issues: read
       id-token: write
     steps:
       # The API commit tool reads each file from disk and follows symlinks, so
