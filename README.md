@@ -152,7 +152,7 @@ Two demo dashboards are provisioned:
 - `provisioning/dashboards/dashboard.json` uses TestData with fixed readings, so it shows every status without any database.
 - `provisioning/dashboards/clickhouse.json` queries a ClickHouse container that `npm run server` starts alongside Grafana. `dev/clickhouse/init.sql` creates made-up sensors and a view that generates a reading per minute up to `now()`, so the plan stays live; one sensor stops reporting 90 minutes back. It also has a CO₂ column, which the panel picks up with no configuration. Grafana installs the ClickHouse data source on start, which needs access to grafana.com.
 
-Requires Grafana 13.2 or later.
+Requires Grafana 13.3 or later.
 
 ### Releasing
 

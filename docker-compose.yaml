@@ -5,6 +5,10 @@ services:
       service: grafana
     # The scaffold in .config still carries the plugin's first id; these follow the current one.
     container_name: 'dkhoa-sensorfloormap-panel'
+    # Default to a Grafana that satisfies grafanaDependency in src/plugin.json; the scaffold default is older.
+    build:
+      args:
+        grafana_version: ${GRAFANA_VERSION:-13.3.0}
     environment:
       GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
       GF_LOG_FILTERS: plugin.dkhoa-sensorfloormap-panel:debug
