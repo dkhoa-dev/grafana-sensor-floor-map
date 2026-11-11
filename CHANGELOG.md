@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3 (2026-11-11)
+
+- Requires Grafana 13.3.0 or later. Grafana 13.2 is no longer supported. The plugin is built against the Grafana 13.3.0 packages, so it uses no API that the oldest supported Grafana lacks.
+- `npm run server` starts Grafana 13.3.0 unless `GRAFANA_VERSION` names another version.
+
 ## 0.2.2 (2026-11-01)
 
 - The AI model choice is stored in the browser under a key prefixed with the plugin id (`dkhoa-sensorfloormap-panel.ai`). A choice saved by an earlier version moves to the new key on first read.
